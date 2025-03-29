@@ -168,9 +168,6 @@ let password = ""; // سيتم جلبها من السحابة
 
 
 
-
-
-
 async function initApp() {
     try {
         // 1. عرض شاشة التحميل
@@ -183,36 +180,58 @@ async function initApp() {
             });
         }
 
-        // 3. جلب البيانات الأساسية
-        await Promise.all([
-            fetchExchangeRate(),
-            loadProducts()
-        ]);
+        // 3. جلب البيانات الأساسية من السحابة
+        const fetchSuccess = await fetchExchangeRate();
+        
+        if (!fetchSuccess) {
+            // إذا فشل جلب البيانات من السحابة، استخدام البيانات المحلية
+            exchangeRate = localStorage.getItem('lastExchangeRate') || 5000;
+            password = localStorage.getItem('password') || '';
+            showNotification("جارٍ استخدام البيانات المحلية بسبب مشكلة في الاتصال", "warning");
+        }
 
-        // 4. تهيئة الواجهة
+        // 4. تطبيق الوضع الليلي إذا كان مفعلاً
+        applyDarkMode();
+        
+        // 5. تهيئة الواجهة
         displayProducts(productsData);
         updateCartUI();
         updateInvoicesUI();
         generateRecommendations();
         
-        // 5. عرض قسم المنتجات فقط في البداية
+        // 6. عرض قسم المنتجات فقط في البداية
         showSection("products");
         
-        // 6. إخفاء شاشة التحميل
-        showLoading(false);
+        // 7. بدء مراقبة التحديثات
+        checkForUpdates();
+        
+        // 8. إخفاء شاشة التحميل
+        setTimeout(() => {
+            showLoading(false);
+        }, 500); // تأخير بسيط لضمان تحميل كل شيء
 
     } catch (error) {
         console.error("خطأ في تهيئة التطبيق:", error);
         
         // استخدام البيانات المحلية كحل بديل
         exchangeRate = localStorage.getItem('lastExchangeRate') || 5000;
+        password = localStorage.getItem('password') || '';
         displayProducts(productsData);
         showSection("products");
         showLoading(false);
         
         showNotification("حدث خطأ في التحميل، جاري استخدام البيانات المحلية", "warning");
+    } finally {
+        // 9. إخفاء رسالة التحذير بعد 5 ثواني
+        setTimeout(hideWarning, 5000);
+        
+        // 10. تحديث أيقونة السلة
+        updateCartIcon();
     }
 }
+
+
+
 
 // دالة مساعدة لعرض/إخفاء شاشة التحميل
 function showLoading(show) {
@@ -814,19 +833,16 @@ function updateCartUI() {
     }
 
     const customerName = document.getElementById("customerName").value.trim();
-    const customerPhone = document.getElementById("customerPhone").value.trim();
+
     
     if (!customerName) {
         showNotification("يجب إدخال اسم المستلم!", "error");
         return;
     }
     
-    if (!customerPhone) {
-        showNotification("يجب إدخال رقم الهاتف!", "error");
-        return;
-    }
+ 
     
-    const customerAddress = document.getElementById("customerAddress").value.trim();
+
     
     const invoice = {
         id: Date.now(),
@@ -838,8 +854,7 @@ function updateCartUI() {
             minute: '2-digit'
         }),
         customerName,
-        customerPhone,
-        customerAddress,
+        
         items: Object.values(cart).map(item => ({
             name: item.isWeightProduct ? `${item.name} (${item.weightLabel})` : item.name,
             price: item.isWeightProduct ? (item.price / 100) : item.price, // السعر لكل غرام للمنتجات بالوزن
@@ -934,56 +949,51 @@ function truncate(str, maxLength) {
 
         // ============== نظام سعر الصرف ==============
         async function saveExchangeRateAndSettings() {
-    const newExchangeRate = parseFloat(document.getElementById("exchangeRate").value);
-    const newPassword = document.getElementById("newPassword").value;
-    
-    if (!newExchangeRate || isNaN(newExchangeRate)) {
-        showNotification("يجب إدخال سعر صرف صحيح", "error");
-        return;
-    }
-    
-    const saveBtn = document.querySelector('.save-settings-btn');
-    const originalBtnText = saveBtn.innerHTML;
-    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
-    saveBtn.disabled = true;
-    
-    try {
-        // تحديث ملف JSON على jsonbin.io
-        const response = await fetch(API_URL, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Master-Key': API_KEY
-            },
-            body: JSON.stringify({
-                exchangeRate: newExchangeRate,
-                password: newPassword || password
-            })
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            exchangeRate = newExchangeRate;
-            if (newPassword) password = newPassword;
+            const newExchangeRate = parseFloat(document.getElementById("exchangeRate").value);
+            const newPassword = document.getElementById("newPassword").value.trim();
             
-            showDesktopNotification("تم التحديث", "تم حفظ الإعدادات بنجاح على السحابة");
-            showNotification("تم حفظ الإعدادات بنجاح!", "success");
-            document.getElementById('currentExchangeRate').textContent = exchangeRate;
-            updatePricesDisplay();
-        } else {
-            throw new Error('Failed to update');
+            if (!newExchangeRate || isNaN(newExchangeRate)) {
+                showNotification("يجب إدخال سعر صرف صحيح", "error");
+                return;
+            }
+            
+            const saveBtn = document.querySelector('.save-settings-btn');
+            const originalBtnText = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
+            saveBtn.disabled = true;
+            
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': API_KEY
+                    },
+                    body: JSON.stringify({
+                        exchangeRate: newExchangeRate,
+                        password: newPassword || password // احتفظ بالقديم إذا لم يتم التغيير
+                    })
+                });
+                
+                if (response.ok) {
+                    exchangeRate = newExchangeRate;
+                    if (newPassword) password = newPassword;
+                    
+                    localStorage.setItem('lastExchangeRate', exchangeRate);
+                    localStorage.setItem('appPassword', password);
+                    
+                    showNotification("تم حفظ الإعدادات بنجاح!", "success");
+                } else {
+                    throw new Error('فشل في الحفظ');
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                showNotification("حدث خطأ أثناء الحفظ على السحابة", "error");
+            } finally {
+                saveBtn.innerHTML = originalBtnText;
+                saveBtn.disabled = false;
+            }
         }
-    } catch (error) {
-        console.error("Error updating settings:", error);
-        showNotification("حدث خطأ أثناء حفظ الإعدادات على السحابة", "error");
-    } finally {
-        saveBtn.innerHTML = originalBtnText;
-        saveBtn.disabled = false;
-    }
-    
-    closePasswordForm();
-}
-
         // ============== نظام كلمة المرور ==============
         function openPasswordForm(section) {
             document.getElementById("passwordForm").style.display = "flex";
@@ -994,14 +1004,21 @@ function truncate(str, maxLength) {
             document.getElementById("passwordForm").style.display = "none";
             document.getElementById("passwordInput").value = "";
         }
-
         function checkPassword() {
-            const inputPassword = document.getElementById("passwordInput").value;
+            const inputPassword = document.getElementById("passwordInput").value.trim();
+            
+            if (!password) {
+                console.error('كلمة المرور غير معرفة!');
+                showNotification("حدث خطأ في النظام، يرجى المحاولة لاحقاً", "error");
+                return;
+            }
+        
             if (inputPassword === password) {
                 const section = document.getElementById("passwordForm").dataset.section;
                 showSection(section);
                 closePasswordForm();
             } else {
+                console.log('كلمة المرور المدخلة:', inputPassword, 'كلمة المرور المتوقعة:', password);
                 showNotification("كلمة المرور غير صحيحة!", "error");
             }
         }
@@ -1579,7 +1596,8 @@ function truncate(str, maxLength) {
  * جلب سعر الصرف من API الخارجي
  * @returns {Promise<boolean>} يعيد true إذا نجح الجلب، false إذا فشل
  */
- async function fetchExchangeRate() {
+
+async function fetchExchangeRate() {
     try {
         const response = await fetch(API_URL, {
             method: 'GET',
@@ -1587,8 +1605,7 @@ function truncate(str, maxLength) {
                 'Content-Type': 'application/json',
                 'X-Master-Key': API_KEY,
                 'X-Bin-Meta': 'false'
-            },
-            timeout: 5000 // مهلة 5 ثواني
+            }
         });
 
         if (!response.ok) {
@@ -1597,25 +1614,32 @@ function truncate(str, maxLength) {
 
         const data = await response.json();
         
-        if (!data || typeof data.exchangeRate === 'undefined') {
-            throw new Error('بيانات سعر الصرف غير موجودة');
+        if (!data || typeof data.exchangeRate === 'undefined' || typeof data.password === 'undefined') {
+            throw new Error('بيانات غير مكتملة');
         }
 
-        exchangeRate = data.exchangeRate;
-        password = data.password || password;
+        // تحديث المتغيرات العامة
+        exchangeRate = parseFloat(data.exchangeRate);
+        password = data.password.toString(); // تأكد أن كلمة المرور نصية
         
-        // تحديث الواجهة
-        updateExchangeRateDisplay(exchangeRate);
-        localStorage.setItem('lastExchangeRate', exchangeRate.toString());
+        // حفظ محلياً للاستخدام عند انقطاع الاتصال
+        localStorage.setItem('lastExchangeRate', exchangeRate);
+        localStorage.setItem('appPassword', password);
         
         return true;
         
     } catch (error) {
-        console.error("فشل في جلب سعر الصرف:", error);
-        updateExchangeRateDisplay(null); // عرض "لم يصدر"
+        console.error("فشل في جلب البيانات:", error);
+        
+        // استخدام البيانات المحلية عند الفشل
+        exchangeRate = parseFloat(localStorage.getItem('lastExchangeRate')) || 5000;
+        password = localStorage.getItem('appPassword') || '';
+        
+        showNotification("جارٍ استخدام البيانات المحلية بسبب مشكلة في الاتصال", "warning");
         return false;
     }
 }
+
 function updatePricesDisplay() {
     if (exchangeRate) {
         // عرض الأسعار عند توفر سعر الصرف
@@ -2173,6 +2197,8 @@ function checkPassword(inputPassword) {
     return false;
 }
 
+
+
 const themeColors = {
     default: {
         primary: '#4a6b8a',
@@ -2227,5 +2253,25 @@ document.addEventListener('DOMContentLoaded', () => {
         navigator.serviceWorker.register('/sw.js');
     }
 });
+
+function checkPassword() {
+    const inputPassword = document.getElementById("passwordInput").value.trim();
+    
+    if (!password) {
+        console.error('كلمة المرور غير معرفة!');
+        showNotification("حدث خطأ في النظام، يرجى المحاولة لاحقاً", "error");
+        return;
+    }
+
+    if (inputPassword === password) {
+        const section = document.getElementById("passwordForm").dataset.section;
+        showSection(section);
+        closePasswordForm();
+    } else {
+        showNotification("كلمة المرور غير صحيحة!", "error");
+    }
+}
+
+
         // ============== تهيئة المتجر عند التحميل ==============
         window.onload = initApp; 
