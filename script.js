@@ -1,7 +1,8 @@
 
-const API_URL = 'https://api.jsonbin.io/v3/b/67e0f6bd8960c979a5773e65'; // استبدل YOUR_BIN_ID بـ Bin ID الخاص بك
-const API_KEY = '$2a$10$y4mNOprJ8lAMY0xM8KfYTuehMVndGcLtG2f83auImdb6Oa/wmXGEC'; // استبدل YOUR_API_KEY بمفتاح API الخاص بك
 
+const GIST_ID = '581b340f1641daacad1d7b4a3dd485fd'; // استبدلها بمعرف الـ Gist الخاص بك
+const GIST_FILE = 'data.json'; // اسم الملف في الـ Gist
+const GITHUB_TOKEN = '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';
 const productsData = [
   { 
     id: 1,
@@ -963,19 +964,42 @@ function truncate(str, maxLength) {
             saveBtn.disabled = true;
             
             try {
-                const response = await fetch(API_URL, {
-                    method: 'PUT',
+                // جلب الـ Gist الحالي أولاً
+                const getResponse = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': API_KEY
+                        'Authorization': `token ${GITHUB_TOKEN}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                
+                const currentGist = await getResponse.json();
+                const currentContent = JSON.parse(currentGist.files[GIST_FILE].content);
+                
+                // تحديث المحتوى
+                const updatedContent = {
+                    ...currentContent,
+                    exchangeRate: newExchangeRate,
+                    password: newPassword || password
+                };
+                
+                // تحديث الـ Gist
+                const updateResponse = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `token ${GITHUB_TOKEN}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        exchangeRate: newExchangeRate,
-                        password: newPassword || password // احتفظ بالقديم إذا لم يتم التغيير
+                        files: {
+                            [GIST_FILE]: {
+                                content: JSON.stringify(updatedContent, null, 2)
+                            }
+                        }
                     })
                 });
                 
-                if (response.ok) {
+                if (updateResponse.ok) {
                     exchangeRate = newExchangeRate;
                     if (newPassword) password = newPassword;
                     
@@ -984,11 +1008,11 @@ function truncate(str, maxLength) {
                     
                     showNotification("تم حفظ الإعدادات بنجاح!", "success");
                 } else {
-                    throw new Error('فشل في الحفظ');
+                    throw new Error('فشل في تحديث Gist');
                 }
             } catch (error) {
                 console.error("Error:", error);
-                showNotification("حدث خطأ أثناء الحفظ على السحابة", "error");
+                showNotification("حدث خطأ أثناء الحفظ على GitHub Gist", "error");
             } finally {
                 saveBtn.innerHTML = originalBtnText;
                 saveBtn.disabled = false;
@@ -1596,15 +1620,12 @@ function truncate(str, maxLength) {
  * جلب سعر الصرف من API الخارجي
  * @returns {Promise<boolean>} يعيد true إذا نجح الجلب، false إذا فشل
  */
-
 async function fetchExchangeRate() {
     try {
-        const response = await fetch(API_URL, {
-            method: 'GET',
+        const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
             headers: {
-                'Content-Type': 'application/json',
-                'X-Master-Key': API_KEY,
-                'X-Bin-Meta': 'false'
+                'Authorization': `token ${GITHUB_TOKEN}`,
+                'Accept': 'application/vnd.github.v3+json'
             }
         });
 
@@ -1612,15 +1633,19 @@ async function fetchExchangeRate() {
             throw new Error(`خطأ في الشبكة: ${response.status}`);
         }
 
-        const data = await response.json();
+        const gistData = await response.json();
+        const content = JSON.parse(gistData.files[GIST_FILE].content);
         
-        if (!data || typeof data.exchangeRate === 'undefined' || typeof data.password === 'undefined') {
-            throw new Error('بيانات غير مكتملة');
+        if (!content || typeof content.exchangeRate === 'undefined') {
+            throw new Error('سعر الصرف غير موجود في البيانات');
         }
 
         // تحديث المتغيرات العامة
-        exchangeRate = parseFloat(data.exchangeRate);
-        password = data.password.toString(); // تأكد أن كلمة المرور نصية
+        exchangeRate = parseFloat(content.exchangeRate);
+        password = content.password || '';
+        
+        // تحديث واجهة المستخدم لعرض السعر المسترد
+        updateExchangeRateDisplay(exchangeRate);
         
         // حفظ محلياً للاستخدام عند انقطاع الاتصال
         localStorage.setItem('lastExchangeRate', exchangeRate);
@@ -1632,9 +1657,11 @@ async function fetchExchangeRate() {
         console.error("فشل في جلب البيانات:", error);
         
         // استخدام البيانات المحلية عند الفشل
-        exchangeRate = parseFloat(localStorage.getItem('lastExchangeRate')) || 5000;
+        const lastRate = localStorage.getItem('lastExchangeRate');
+        exchangeRate = lastRate ? parseFloat(lastRate) : null;
         password = localStorage.getItem('appPassword') || '';
         
+        updateExchangeRateDisplay(exchangeRate);
         showNotification("جارٍ استخدام البيانات المحلية بسبب مشكلة في الاتصال", "warning");
         return false;
     }
@@ -2271,6 +2298,45 @@ function checkPassword() {
         showNotification("كلمة المرور غير صحيحة!", "error");
     }
 }
+
+
+function updateExchangeRateDisplay(rate) {
+    const rateElement = document.getElementById('currentExchangeRate');
+    const rateInput = document.getElementById('exchangeRate');
+    
+    if (rate) {
+        // إذا كان السعر متاحاً
+        rateElement.textContent = rate;
+        if (rateInput) rateInput.value = rate;
+        
+        // تحديث جميع أسعار المنتجات
+        document.querySelectorAll('.syp-price').forEach(el => {
+            const productId = el.closest('.product')?.getAttribute('data-id');
+            if (productId) {
+                const product = productsData.find(p => p.id == productId);
+                if (product) {
+                    el.innerHTML = `
+                        <span class="price-label">بالليرة:</span>
+                        <span class="price-value">${Math.round(product.price * rate)} ل.س</span>
+                    `;
+                }
+            }
+        });
+    } else {
+        // إذا فشل جلب السعر
+        rateElement.textContent = 'لم يصدر';
+        if (rateInput) rateInput.placeholder = 'لم يصدر سعر الصرف';
+        
+        // عرض "لم يصدر" لجميع المنتجات
+        document.querySelectorAll('.syp-price').forEach(el => {
+            el.innerHTML = `
+                <span class="price-label">بالليرة:</span>
+                <span class="price-value">لم يصدر</span>
+            `;
+        });
+    }
+}
+
 
 
         // ============== تهيئة المتجر عند التحميل ==============
