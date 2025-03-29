@@ -1862,8 +1862,9 @@ background: var(--primary-color);
 border-radius: 4px;
 }
 .theme-picker {
+
 position: fixed;
-bottom: 20px;
+top:20px;
 left: 20px;
 z-index: 1000;
 background: white;
@@ -1872,6 +1873,7 @@ border-radius: 8px;
 box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 display: flex;
 gap: 5px;
+display: none;
 }
 
 .theme-picker button {
@@ -1885,3 +1887,22 @@ cursor: pointer;
 .theme-picker button:nth-child(1) { background: #456b96; }
 .theme-picker button:nth-child(2) { background: #3a4d6b; }
 .theme-picker button:nth-child(3) { background: #446a9c; }
+#passwordForm{
+
+    position: fixed;
+    left: 18%;
+    width: 65%;
+}
+#passwordForm input{
+
+   width: 70%;
+   position: relative; 
+   left: -20px;
+
+}
+.cart-icon{
+
+position: fixed;
+
+
+}
