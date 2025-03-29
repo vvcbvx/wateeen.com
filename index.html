@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>متجر الوتيّن</title>
+    <link rel="icon" href="logo.png" type="image/png">
+<meta name="theme-color" content="#4a6b8a">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
+ 
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="progress-bar" id="progressBar"></div>
+
+    <div class="loading-container" id="loadingContainer">
+        <div class="loading-spinner"></div>
+        <p>جاري تحميل المتجر...</p>
+    </div>
+
+    <div class="notification-container" id="notificationContainer"></div>
+
+    <div class="warning-message" id="warningMessage">
+        <h3><i class="fas fa-exclamation-triangle"></i> تنبيه هام</h3>
+        <ul>
+            <li>الأسعار قابلة للتغيير في أي لحظة</li>
+            <li>يجب أن يحضر رجل أو ولد لاستلام الطلبات</li>
+            <li>الدفع عند الاستلام فقط</li>
+        </ul>
+        <button onclick="hideWarning()"><i class="fas fa-check"></i> فهمت</button>
+    </div>
+
+    <button class="menu-icon" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+    <button class="search-icon" onclick="toggleSearch()"><i class="fas fa-search"></i></button>
+    <button class="cart-icon" onclick="toggleCart()"><i class="fas fa-shopping-cart"></i></button>
+    <button class="theme-toggle" onclick="toggleTheme()"><i class="fas fa-palette"></i></button>
+    
+    <header>
+        <img src="logo.png" alt="شعار متجر الوتيّن" class="logo">
+        <h1>متجر الوتيّن</h1>
+        <input type="text" id="searchInput" placeholder="ابحث عن منتج..." oninput="searchProducts()">
+    </header>
+    
+    <main>
+        <div class="filters-container">
+            <button class="filter-btn active" onclick="filterProducts('all')">
+                <i class="fas fa-boxes"></i> جميع المنتجات
+            </button>
+            <button class="filter-btn" onclick="filterProducts('عصائر')">
+                <i class="fas fa-glass-whiskey"></i> عصائر
+            </button>
+            <button class="filter-btn" onclick="filterProducts('موالح')">
+                <i class="fas fa-seedling"></i> موالح
+            </button>
+            <button class="filter-btn" onclick="filterProducts('حلويات')">
+                <i class="fas fa-cookie"></i> حلويات
+            </button>
+        </div>
+
+        <section id="products">
+            <!-- المنتجات ستُعرض هنا -->
+        </section>
+        
+        <section class="recommendations-section" id="recommendationsSection">
+            <h2 class="section-title"><i class="fas fa-lightbulb"></i> نوصي لك</h2>
+            <div class="recommendations-grid" id="recommendationsList">
+                <p>جاري تحليل مشترياتك لتقديم أفضل التوصيات...</p>
+            </div>
+        </section>
+        <link rel="manifest" href="manifest.webmanifest">
+        <meta name="theme-color" content="#4a6b8a">
+        <section id="exchangeRateSection" class="exchange-rate-container">
+            <h2 class="section-title"><i class="fas fa-dollar-sign"></i> إعدادات سعر الصرف</h2>
+            <div class="settings-form">
+                <div class="form-row">
+                    <label for="exchangeRate">سعر الدولار:</label>
+                    <input type="number" id="exchangeRate" step="0.01" placeholder="أدخل سعر الصرف" class="form-control">
+                </div>
+                <div class="form-row">
+                    <label for="newPassword">كلمة المرور:</label>
+                    <input type="password" id="newPassword" placeholder="كلمة المرور الجديدة" class="form-control">
+                </div>
+                <button class="save-settings-btn" onclick="saveExchangeRateAndSettings()">
+                    <i class="fas fa-save"></i> حفظ الإعدادات
+                </button>
+                <div class="current-rate">
+                    السعر الحالي: <span class="current-rate-value" id="currentExchangeRate">5000</span> ليرة سورية
+                </div>
+            </div>
+        </section>
+        
+        <section id="completedInvoices">
+            <h2 class="section-title"><i class="fas fa-receipt"></i> الفواتير المكتملة</h2>
+            <div class="invoices-container" id="invoicesList">
+                <!-- الفواتير ستُعرض هنا -->
+            </div>
+        </section>
+
+        <section id="maintenanceSection" class="maintenance-container">
+            <div class="maintenance-icon">
+                <i class="fas fa-tools"></i>
+            </div>
+            <h2 class="maintenance-title">بهارات لؤي - تحت الصيانة</h2>
+            <p class="maintenance-message">
+                نعمل حالياً على تحسين هذا القسم لخدمتكم بشكل أفضل.
+                نعتذر للإزعاج وسنكون معكم قريباً بمشيئة الله.
+                يمكنكم تصفح باقي الأقسام أو التواصل معنا للاستفسار.
+            </p>
+            <button class="form-btn secondary" onclick="showSection('products')">
+                <i class="fas fa-arrow-left"></i> العودة للمتجر
+            </button>
+        </section>
+        
+        <aside id="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-store"></i> أقسام المتجر</h2>
+                <button class="close-sidebar" onclick="toggleSidebar()">&times;</button>
+            </div>
+            <ul>
+                <li onclick="showSection('products')">
+                    <i class="fas fa-box-open"></i> المنتجات
+                </li>
+                <li onclick="openPasswordForm('exchangeRateSection')">
+                    <i class="fas fa-dollar-sign"></i> سعر الصرف
+                </li>
+
+
+ <li onclick="showSection('favorites')">
+            <i class="fas fa-heart"></i> المفضلة
+        </li>
+
+
+
+
+                <li onclick="manageNotifications()">
+                    <i class="fas fa-bell"></i> إدارة الإشعارات
+                </li>
+                <li onclick="showSection('completedInvoices')">
+                    <i class="fas fa-receipt"></i> الفواتير
+                </li>
+                <li onclick="showSection('maintenanceSection')">
+                    <i class="fas fa-pepper-hot"></i> بهارات لؤي
+                </li>
+                <li onclick="toggleTheme()">
+                    <i class="fas fa-moon"></i> المظهر الغامق
+                </li>
+                <li onclick="window.open('tel:+963123456789')">
+                    <i class="fas fa-phone"></i> اتصل بنا
+                </li>
+            </ul>
+        </aside>
+
+
+        <section id="favorites" style="display:none;">
+            <h2 class="section-title"><i class="fas fa-heart"></i> المنتجات المفضلة</h2>
+            <div id="favoritesList" class="products-grid">
+                <!-- سيتم عرض المنتجات المفضلة هنا -->
+            </div>
+        </section>
+
+
+        
+        <div class="cart" id="shoppingCart">
+            <div class="cart-header">
+                <h2><i class="fas fa-shopping-cart"></i> سلة التسوق</h2>
+                <button class="close-cart" onclick="toggleCart()">&times;</button>
+            </div>
+            <ul id="cartItems"></ul>
+            <div class="cart-footer">
+                <div class="cart-total">
+                    <span class="total-label">المجموع:</span>
+                    <span class="total-amount">$<span id="cartTotal">0.00</span></span>
+                </div>
+                <button class="checkout-btn" onclick="openCheckoutForm()">
+                    <i class="fas fa-check"></i> إنهاء الشراء
+                </button>
+            </div>
+        </div>
+    </main>
+    
+    <div class="checkout-form" id="checkoutForm">
+        <div class="form-container">
+            <h3><i class="fas fa-cash-register"></i> إنهاء الشراء</h3>
+            <div class="form-group">
+                <label for="customerName">اسم المستلم:</label>
+                <input type="text" id="customerName" placeholder="أدخل اسم المستلم">
+            </div>
+            <div class="form-group">
+                <label for="customerPhone">رقم الهاتف:</label>
+                <input type="tel" id="customerPhone" placeholder="أدخل رقم الهاتف">
+            </div>
+            <div class="form-group">
+                <label for="customerAddress">العنوان (اختياري):</label>
+                <textarea id="customerAddress" rows="3" placeholder="أدخل عنوانك"></textarea>
+            </div>
+            <div class="form-actions">
+                <button class="form-btn primary" onclick="processCheckout()">
+                    <i class="fas fa-check"></i> تأكيد الطلب
+                </button>
+                <button class="form-btn secondary" onclick="closeCheckoutForm()">
+                    <i class="fas fa-times"></i> إلغاء
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="password-form" id="passwordForm">
+        <div class="form-container">
+            <h3><i class="fas fa-lock"></i> أدخل كلمة المرور</h3>
+            <div class="form-group">
+                <input type="password" id="passwordInput" placeholder="كلمة المرور">
+            </div>
+            <div class="form-actions">
+                <button class="form-btn primary" onclick="checkPassword()">
+                    <i class="fas fa-check"></i> تأكيد
+                </button>
+                <button class="form-btn secondary" onclick="closePasswordForm()">
+                    <i class="fas fa-times"></i> إلغاء
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="back-to-top" id="backToTop" onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </div>
+<script src="script.js"></script>
+</body>
+</html> 
